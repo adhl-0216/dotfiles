@@ -1,0 +1,5 @@
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+# This symbol appears when you press Esc and enter Normal mode
+vicmd_symbol = "[❮](bold yellow)"

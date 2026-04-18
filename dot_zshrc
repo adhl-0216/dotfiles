@@ -1,0 +1,68 @@
+# ==============================================================================
+# 1. ZINIT PLUGIN MANAGER INITIALIZATION
+# ==============================================================================
+ZINIT_HOME="${ZINIT_HOME:-${HOME}/.local/share/zinit/zinit.git}"
+if [[ ! -f "$ZINIT_HOME/zinit.zsh" ]]; then
+    print -P "%F{33}▓▒░ %F{34}Installing Zinit...%f"
+    mkdir -p "$(dirname "$ZINIT_HOME")"
+    git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
+fi
+source "$ZINIT_HOME/zinit.zsh"
+
+zinit light zsh-users/zsh-autosuggestions
+zinit light zsh-users/zsh-syntax-highlighting
+zinit light zsh-users/zsh-completions
+
+zinit snippet OMZ::lib/completion.zsh
+zinit snippet OMZ::lib/history.zsh
+zinit snippet OMZ::lib/key-bindings.zsh
+
+# ==============================================================================
+# 2. CACHYOS SHELL EXPERIENCE & SENSEFUL DEFAULTS
+# ==============================================================================
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=10000
+SAVEHIST=10000
+setopt SHARE_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS HIST_IGNORE_SPACE AUTO_CD
+
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+
+if [[ -o interactive ]] && command -v fastfetch &> /dev/null; then
+    fastfetch
+fi
+
+export MANROFFOPT="-c"
+if command -v bat &> /dev/null; then
+    export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+fi
+
+# ==============================================================================
+# 3. MODERN CLI TOOLS INTEGRATION
+# ==============================================================================
+if command -v starship &> /dev/null; then eval "$(starship init zsh)"; fi
+if command -v zoxide &> /dev/null; then eval "$(zoxide init zsh)"; fi
+if command -v fzf &> /dev/null; then source <(fzf --zsh); fi
+
+# Yazi Wrapper
+if command -v yazi &> /dev/null; then
+    function yy() {
+        local tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+        yazi "$@" --cwd-file="$tmp"
+        if cwd="$(cat -- "$tmp")" &&[ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+            builtin cd -- "$cwd"
+        fi
+        rm -f -- "$tmp"
+    }
+fi
+
+# ==============================================================================
+# 4. LOAD EXTERNAL ALIASES
+# ==============================================================================
+if [[ -f "$HOME/.config/zsh/aliases.zsh" ]]; then
+    source "$HOME/.config/zsh/aliases.zsh"
+fi
+
+if [[ -f "$HOME/.config/zsh/vi-mode.zsh" ]]; then
+    source "$HOME/.config/zsh/vi-mode.zsh"
+fi
