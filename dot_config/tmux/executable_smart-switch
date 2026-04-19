@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+CURRENT=$(tmux display-message -p '#S')
+
+tmux set-option destroy-unattached off
+
+LAST=$(
+  tmux list-sessions -F '#{session_activity} #{session_name}' |
+    awk -v cur="$CURRENT" '$2 != cur' |
+    sort -rn |
+    head -1 |
+    awk '{print $2}'
+)
+
+if [[ -n "$LAST" ]]; then
+  tmux switch-client -t "$LAST"
+else
+  NEW_NAME=$(petname)
+  tmux new-session -d -s "$NEW_NAME"
+  tmux switch-client -t "$NEW_NAME"
+fi
