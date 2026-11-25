@@ -1,0 +1,153 @@
+{
+  "dankKDEConnect": {
+    "enabled": true,
+    "selectedDeviceId": "6c4326e2897e4411b08a083d5bf59d52",
+    "enableClipboardAction": true,
+    "scanSubdirectories": true
+  },
+  "dankPomodoroTimer": {
+    "enabled": true,
+    "autoStartBreaks": false,
+    "autoStartPomodoros": false,
+    "autoSetDND": false
+  },
+  "emojiLauncher": {
+    "enabled": true,
+    "recentEmojis": "󰚗,,▶"
+  },
+  "calculator": {
+    "enabled": true,
+    "trigger": "="
+  },
+  "networkIndicator": {
+    "enabled": true,
+    "updateInterval": 1,
+    "displayMode": "separate"
+  },
+  "systemMonitorPlus": {
+    "enabled": true,
+    "ramUsageEnabled": true,
+    "networkSpeedEnabled": true,
+    "cpuUsageVisualStyle": "gauge",
+    "ramUsageVisualStyle": "gauge",
+    "ramUsageTextMode": "value",
+    "ramUsageColorizeText": true,
+    "networkSpeedVisualStyle": "default",
+    "cpuUsageColorizeText": true,
+    "networkSpeedColorizeText": true,
+    "networkSpeedShortUnits": true,
+    "diskPartitionUsageEnabled": false,
+    "ramUsageIconName": "",
+    "ramUsageFixedTextWidth": false,
+    "ramUsageShowText": true,
+    "ramUsageShowIcon": true,
+    "cpuUsageEnabled": false,
+    "cpuTempEnabled": false,
+    "networkSpeedShowIcon": true,
+    "networkSpeedShowText": true,
+    "networkSpeedShowSeparator": false,
+    "networkSpeedFixedTextWidth": true,
+    "networkSpeedFixedTextWidthH": 90
+  },
+  "dankscale": {
+    "enabled": true,
+    "lastAccount": "hanlim2002@gmail.com"
+  },
+  "wallpaperCarousel": {
+    "enabled": true,
+    "itemWidth": 300,
+    "cacheSize": 30,
+    "overlayOpacity": 80,
+    "expandMultiplier": 120,
+    "selectedScale": 108
+  },
+  "wallpaperDiscovery": {
+    "enabled": true
+  },
+  "dankLauncherKeys": {
+    "enabled": true
+  },
+  "mediaControlPlus": {
+    "enabled": true,
+    "showWhenNoPlayer": true,
+    "scrollVolumeMode": "sink",
+    "showHorizontalVisualizer": true,
+    "showVerticalVisualizer": true,
+    "horizontalVisualizerUseGradient": false,
+    "verticalVisualizerAlwaysVisible": false,
+    "horizontalVisualizerAlwaysVisible": true,
+    "showVerticalTitle": true,
+    "showVerticalSkipControls": false,
+    "showVerticalPlayPause": false,
+    "showHorizontalTitle": true,
+    "showHorizontalTitleBackground": false,
+    "showHorizontalSkipControls": false,
+    "showHorizontalPlayPause": false,
+    "horizontalShowTitleWhenIdle": true,
+    "horizontalShowControlsWhenIdle": false,
+    "horizontalTitleScrollBehavior": "always",
+    "horizontalTitleExtent": 120,
+    "horizontalVisualizerWidth": 64,
+    "horizontalVisualizerBars": 20,
+    "horizontalVisualizerStretchToWidth": true,
+    "horizontalVisualizerStyle": "dottedParticles",
+    "horizontalLayoutOrder": "controls,title,visualizer",
+    "horizontalTitleTextColorKey": "surfaceVariantText",
+    "horizontalVisualizerBarAlignment": "bottom",
+    "horizontalVisualizerChannelMode": "outsideIn",
+    "horizontalVisualizerPeakHold": false,
+    "horizontalVisualizerPeakHoldMs": 100,
+    "horizontalVisualizerAttack": 100,
+    "horizontalVisualizerResponseCurve": 55,
+    "horizontalVisualizerRelease": 30,
+    "horizontalTitlePadding": 20,
+    "horizontalTitleRadius": 12,
+    "showPopoutInnerBackground": true,
+    "horizontalTitleBackgroundColorKey": "primaryContainer",
+    "horizontalTitleScrollSpeed": 8
+  },
+  "systemMonitor": {
+    "enabled": true,
+    "cpuShowValue": true,
+    "cpuShowChart": false,
+    "memShowChart": false,
+    "memShowValue": true,
+    "showTemp": false,
+    "netShowValue": true,
+    "showNet": false
+  },
+  "bitwarden": {
+    "enabled": true
+  },
+  "commandRunner": {
+    "enabled": true,
+    "history": [
+      "firefox -p NSFW &!",
+      "firefox -p NSFW",
+      "firefox -p NSFW\\",
+      "uefitool",
+      "firefox -p NSFW &>/dev/null &!",
+      "ls -la",
+      "firefox -p NSFW & disown"
+    ],
+    "terminal": "kitty"
+  },
+  "displayProfile": {
+    "enabled": true
+  },
+  "dankVault": {
+    "enabled": true,
+    "triggerOnlyVisibilityDefaultApplied": true
+  },
+  "mpvpaper": {
+    "enabled": true,
+    "customMpvOptions": "--mute --loop-file=inf",
+    "videoLibrary": [
+      "/home/adhl/.pdb/160168-7b929d1116c542ecf2550f6d8a827d09.mp4",
+      "/home/adhl/Pictures/Wallpapers/yuta-okkotsu-curse-spirit.3840x2160.mp4"
+    ],
+    "monitorVideos": {
+      "eDP-1": "/home/adhl/Pictures/Wallpapers/yuta-okkotsu-curse-spirit.3840x2160.mp4"
+    }
+  }
+}

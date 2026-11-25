@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "configurations": [
+    {
+      "id": "auto_eed335ba",
+      "name": "",
+      "outputs": {
+        "eDP-1": {
+          "mode": "1920x1080@165.004",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "scale": 1,
+          "transform": "Normal",
+          "vrr": false,
+          "disabled": false,
+          "niri": {}
+        },
+        "HDMI-A-1": {
+          "mode": "1920x1080@60.000",
+          "position": {
+            "x": 1920,
+            "y": 800
+          },
+          "scale": 0.796875,
+          "transform": "Normal",
+          "vrr": false,
+          "disabled": false,
+          "niri": {}
+        }
+      }
+    },
+    {
+      "id": "profile_1786312834492_w9ghcc1",
+      "name": "Default",
+      "outputs": {
+        "eDP-1": {
+          "mode": "1920x1080@165.004",
+          "position": {
+            "x": 0,
+            "y": 275
+          },
+          "scale": 1,
+          "transform": "Normal",
+          "vrr": false,
+          "disabled": false,
+          "niri": {}
+        },
+        "HDMI-A-1": {
+          "mode": "1920x1080@60.000",
+          "position": {
+            "x": 1920,
+            "y": 0
+          },
+          "scale": 0.75,
+          "transform": "Normal",
+          "vrr": false,
+          "disabled": false,
+          "niri": {}
+        }
+      }
+    },
+    {
+      "id": "profile_1786312850814_j0fmorx",
+      "name": "External Vert",
+      "outputs": {
+        "eDP-1": {
+          "mode": "1920x1080@165.004",
+          "position": {
+            "x": 0,
+            "y": 275
+          },
+          "scale": 1,
+          "transform": "Normal",
+          "vrr": false,
+          "disabled": false,
+          "niri": {}
+        },
+        "HDMI-A-1": {
+          "mode": "1920x1080@60.000",
+          "position": {
+            "x": 1920,
+            "y": 0
+          },
+          "scale": 0.796875,
+          "transform": "270",
+          "vrr": false,
+          "disabled": false,
+          "niri": {}
+        }
+      }
+    },
+    {
+      "id": "profile_1786442558732_pwiar63",
+      "name": "Work",
+      "outputs": {
+        "eDP-1": {
+          "mode": "1920x1080@165.004",
+          "position": {
+            "x": 2560,
+            "y": 360
+          },
+          "scale": 1,
+          "transform": "Normal",
+          "vrr": false,
+          "disabled": false,
+          "niri": {}
+        },
+        "HDMI-A-1": {
+          "mode": "1920x1080@60.000",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "scale": 0.75,
+          "transform": "Normal",
+          "vrr": false,
+          "disabled": false,
+          "niri": {}
+        }
+      }
+    }
+  ]
+}

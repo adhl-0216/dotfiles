@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+# Extracted Name Generator
+ADJ=(bright cold dark fierce giant grand hazy inner light mega neon outer prime quiet rapid super tidal ultra vast wild)
+NOUN=(atlas beam core dawn echo flux gate hawk icon jolt kite link mesa node orbit path quest roar star tower unit void)
+
+echo "${ADJ[$RANDOM % ${#ADJ[@]}]}-${NOUN[$RANDOM % ${#NOUN[@]}]}"

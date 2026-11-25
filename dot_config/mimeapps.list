@@ -1,0 +1,40 @@
+[Default Applications]
+application/pdf=okularApplication_pdf.desktop
+application/x-extension-htm=zen.desktop
+application/x-extension-html=zen.desktop
+application/x-extension-shtml=zen.desktop
+application/x-extension-xht=zen.desktop
+application/x-extension-xhtml=zen.desktop
+application/xhtml+xml=zen.desktop
+text/html=firefox.desktop
+text/plain=nvim.desktop
+x-scheme-handler/calendar=dms-open.desktop
+x-scheme-handler/chrome=zen.desktop
+x-scheme-handler/http=zen.desktop
+x-scheme-handler/https=zen.desktop
+x-scheme-handler/slack=slack.desktop
+x-scheme-handler/tonsite=org.telegram.desktop.desktop
+text/x-shellscript=vim.desktop
+text/x-python=vim.desktop
+text/x-script.python=vim.desktop
+x-scheme-handler/anytype=anytype.desktop
+image=feh.desktop
+image/png=feh.desktop
+x-scheme-handler/ton=org.telegram.desktop.desktop
+
+[Added Associations]
+application/x-extension-htm=zen.desktop;
+application/x-extension-html=zen.desktop;
+application/x-extension-shtml=zen.desktop;
+application/x-extension-xht=zen.desktop;
+application/x-extension-xhtml=zen.desktop;
+application/xhtml+xml=zen.desktop;
+text/html=zen.desktop;
+x-scheme-handler/calendar=dms-open.desktop;
+x-scheme-handler/chrome=zen.desktop;
+x-scheme-handler/http=zen.desktop;
+x-scheme-handler/https=zen.desktop;
+x-scheme-handler/tonsite=org.telegram.desktop.desktop;
+x-scheme-handler/ton=org.telegram.desktop.desktop;
+
+[Removed Associations]

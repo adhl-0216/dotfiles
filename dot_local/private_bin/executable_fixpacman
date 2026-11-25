@@ -1,0 +1,579 @@
+#!/usr/bin/env bash
+#
+# fixpacman - common pacman/paru repairs and maintenance without touching packages
+#
+# Guarantees
+#   * never installs, removes, upgrades or downgrades a package
+#   * never edits files outside /etc/pacman.d, /var/lib/pacman, /var/cache/pacman,
+#     /var/cache/pkgfile and the pacman/paru caches (plus its own backup dir)
+#   * mirrorlists are backed up before ranking; --restore-mirrors rolls them back
+#
+# Written against: pacman 7.1.0, paru 2.2.1, pacman-contrib 1.13.1,
+# rate-mirrors 0.33.0, reflector 2023, pkgfile 27.
+#
+# Run "fixpacman --help" for options.
+
+set -uo pipefail
+
+PROG=${0##*/}
+VERSION=1.0
+
+# ---------------------------------------------------------------- defaults ---
+DRY_RUN=0
+YES=0
+KEEP=2
+DO_MIRRORS=1
+DO_KEYRING=1
+KEYSERVER=0
+DO_REFRESH=1
+DO_CACHE=1
+PARU_CLEAN=0
+PARU_CLEAN_ALL=0
+DO_PKGFILE=1
+FILESDB=0
+CHECK_FILES=0
+FIX_LOCK=0
+AGGRESSIVE=0
+RESTORE=0
+USE_COLOR=auto
+
+STATE_DIR=${FIXPACMAN_STATE_DIR:-/var/lib/fixpacman}
+MIRROR_FILES=(
+	/etc/pacman.d/mirrorlist
+	/etc/pacman.d/cachyos-mirrorlist
+	/etc/pacman.d/cachyos-v3-mirrorlist
+	/etc/pacman.d/cachyos-v4-mirrorlist
+)
+BACKUP_DIR=
+CACHE_DIR=
+CACHE_BEFORE=0
+CACHE_AFTER=0
+CACHE_CLEANED=0
+FAILED=()
+
+# ------------------------------------------------------------------ output ---
+if [[ $USE_COLOR == auto ]]; then
+	if [[ -t 1 || -t 0 ]] && [[ -z ${NO_COLOR:-} ]]; then USE_COLOR=1; else USE_COLOR=0; fi
+fi
+if (( USE_COLOR )); then
+	C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_RED=$'\e[31m'
+	C_GREEN=$'\e[32m'; C_YELLOW=$'\e[33m'; C_BLUE=$'\e[34m'
+else
+	C_RESET=; C_BOLD=; C_RED=; C_GREEN=; C_YELLOW=; C_BLUE=
+fi
+
+section() { printf '\n%s==> %s%s\n' "$C_BOLD$C_BLUE" "$*" "$C_RESET"; }
+info()    { printf '%s -->%s %s\n' "$C_YELLOW" "$C_RESET" "$*"; }
+ok()      { printf '%s   ok%s %s\n' "$C_GREEN" "$C_RESET" "$*"; }
+warn()    { printf '%s  warn%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; }
+die()     { warn "$*"; exit 1; }
+have()    { command -v "$1" >/dev/null 2>&1; }
+
+usage() {
+	cat <<EOF
+$PROG $VERSION - repair pacman/paru state without adding or removing packages
+
+Usage: $PROG [options]
+
+Default run: back up mirrorlists, rank mirrors, repopulate the keyring,
+refresh sync databases, clean the package cache, update the pkgfile database,
+then report database/user-facing problems.
+
+Options:
+  -n, --dry-run          show every action without changing anything
+  -y, --yes              answer yes to all prompts (required without a TTY)
+  -k, --keep NUM         cached versions to keep per package (default: $KEEP)
+      --no-mirrors       skip mirror ranking
+      --no-keyring       skip keyring repopulation
+      --keyserver        also refresh keys from the keyserver (slow, network heavy)
+      --no-refresh       skip "pacman -Syy"
+      --no-cache         skip package cache cleaning
+      --paru-cache       clean untracked files in paru AUR clones (keeps clones)
+      --paru-cache-all   delete every paru AUR clone directory
+      --no-pkgfile       skip "pkgfile --update"
+      --files-db         also fetch the pacman files databases ("pacman -Fy")
+      --check-files      verify all installed files ("pacman -Qkk", slow)
+      --fix-lock         remove a stale /var/lib/pacman/db.lck (no pacman running)
+      --aggressive       also drop unused sync databases and stale download dirs
+      --restore-mirrors  restore the most recent mirrorlist backup and exit
+      --no-color         disable colored output
+  -h, --help             show this help
+
+Never touched: installed package set, package reasons, AUR builds, config files
+outside the pacman scope. Orphaned packages are only reported, never removed.
+
+Files written: /etc/pacman.d/*mirrorlist (with backups), /var/lib/pacman/sync,
+/etc/pacman.d/gnupg, /var/cache/pacman/pkg, /var/cache/pkgfile,
+\$HOME/.cache/paru, and backups under $STATE_DIR.
+EOF
+}
+
+# ------------------------------------------------------------------ helpers ---
+confirm() {
+	local prompt=$1 answer
+	(( DRY_RUN )) && return 0
+	(( YES )) && return 0
+	if [[ ! -t 0 ]]; then
+		warn "skipping: $prompt (no TTY; re-run with --yes)"
+		return 1
+	fi
+	printf '%s??%s %s [Y/n] ' "$C_BOLD" "$C_RESET" "$prompt"
+	if ! read -r answer; then
+		printf '\n'
+		return 1
+	fi
+	[[ -z $answer || $answer == [Yy]* ]]
+}
+
+# run a mutating command, honouring --dry-run and recording failures
+run() {
+	if (( DRY_RUN )); then
+		printf '%s[dry-run]%s %s\n' "$C_YELLOW" "$C_RESET" "$*"
+		return 0
+	fi
+	printf '   %s+%s %s\n' "$C_BOLD" "$C_RESET" "$*"
+	if "$@"; then
+		return 0
+	fi
+	local rc=$?
+	warn "command failed (rc=$rc): $*"
+	FAILED+=("$*")
+	return $rc
+}
+
+cache_bytes() { du -sb -- "$1" 2>/dev/null | awk '{print $1+0}'; }
+human()       { numfmt --to=iec --suffix=B "$1" 2>/dev/null || printf '%sB' "$1"; }
+
+# ------------------------------------------------------------- arg parsing ---
+parse_args() {
+	while (($#)); do
+		case $1 in
+			-n|--dry-run)     DRY_RUN=1 ;;
+			-y|--yes)         YES=1 ;;
+			-k|--keep)
+				[[ ${2:-} =~ ^[0-9]+$ ]] || die "--keep needs a non-negative number"
+				KEEP=$2; shift ;;
+			--no-mirrors)     DO_MIRRORS=0 ;;
+			--no-keyring)     DO_KEYRING=0 ;;
+			--keyserver)      KEYSERVER=1 ;;
+			--no-refresh)     DO_REFRESH=0 ;;
+			--no-cache)       DO_CACHE=0 ;;
+			--paru-cache)     PARU_CLEAN=1 ;;
+			--paru-cache-all) PARU_CLEAN_ALL=1; PARU_CLEAN=1 ;;
+			--no-pkgfile)     DO_PKGFILE=0 ;;
+			--files-db)       FILESDB=1 ;;
+			--check-files)    CHECK_FILES=1 ;;
+			--fix-lock)       FIX_LOCK=1 ;;
+			--aggressive)     AGGRESSIVE=1 ;;
+			--restore-mirrors) RESTORE=1 ;;
+			--no-color)       USE_COLOR=0 ;;
+			-h|--help)        usage; exit 0 ;;
+			*)                die "unknown option: $1 (try --help)" ;;
+		esac
+		shift
+	done
+	# recompute colors after parsing --no-color
+	if (( USE_COLOR == 0 )); then
+		C_RESET=; C_BOLD=; C_RED=; C_GREEN=; C_YELLOW=; C_BLUE=
+	fi
+}
+
+# ------------------------------------------------------------------ logging ---
+setup_logging() {
+	(( DRY_RUN )) && return
+	have tee || return
+	mkdir -p "$STATE_DIR/logs" 2>/dev/null || return
+	local log
+	log="$STATE_DIR/logs/fixpacman-$(date +%Y%m%d-%H%M%S).log"
+	exec > >(tee -a -- "$log") 2>&1
+}
+
+# ------------------------------------------------------------------ preflight ---
+preflight() {
+	section "Preflight"
+	have pacman || die "pacman not found"
+
+	local pv
+	pv=$(pacman -Q pacman 2>/dev/null) || pv="pacman (version unknown)"
+	printf '   %s\n' "$pv"
+	have paru && printf '   %s\n' "$(paru -V 2>/dev/null | head -1)"
+
+	local procs
+	procs=$(pgrep -x 'pacman|paru' 2>/dev/null || true)
+	if [[ -n $procs ]]; then
+		if (( DRY_RUN )); then
+			warn "a pacman/paru process is running; real runs will abort"
+		else
+			die "pacman/paru is running - refusing to touch the databases"
+		fi
+	fi
+
+	if [[ -e /var/lib/pacman/db.lck ]]; then
+		if (( FIX_LOCK )); then
+			info "removing stale database lock"
+			run rm -f -- /var/lib/pacman/db.lck
+		else
+			warn "stale lock: /var/lib/pacman/db.lck (re-run with --fix-lock to remove)"
+		fi
+	fi
+
+	local avail_kb
+	avail_kb=$(df -Pk / 2>/dev/null | awk 'NR==2{print $4}')
+	if [[ -n ${avail_kb:-} ]] && (( avail_kb < 1048576 )); then
+		warn "less than 1 GiB free on / - cache cleaning becomes more important"
+	fi
+
+	if have timedatectl; then
+		local ntp
+		ntp=$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)
+		[[ $ntp == yes ]] || warn "clock is not NTP-synchronized; PGP signature checks can fail"
+	fi
+}
+
+# -------------------------------------------------------------------- mirrors ---
+backup_mirrors() {
+	local ts dir f
+	ts=$(date +%Y%m%d-%H%M%S)
+	dir="$STATE_DIR/mirrors-$ts"
+	BACKUP_DIR=$dir
+	if (( DRY_RUN )); then
+		info "[dry-run] back up mirrorlists to $dir"
+		return 0
+	fi
+	mkdir -p "$dir" || { warn "cannot create $dir"; return 1; }
+	for f in "${MIRROR_FILES[@]}"; do
+		[[ -e $f ]] && cp -a -- "$f" "$dir"/
+	done
+	local -a old=()
+	mapfile -t old < <(ls -1dt "$STATE_DIR"/mirrors-* 2>/dev/null | tail -n +6)
+	((${#old[@]})) && rm -rf -- "${old[@]}"
+	info "mirrorlists backed up to $dir"
+}
+
+restore_from() {
+	local dir=$1 f
+	[[ -n $dir && -d $dir ]] || { warn "backup directory not usable: ${dir:-<none>}"; return 1; }
+	for f in "$dir"/*; do
+		[[ -f $f ]] || continue
+		run cp -a -- "$f" /etc/pacman.d/
+	done
+}
+
+restore_mirrors() {
+	section "Restore mirrorlists"
+	local latest
+	latest=$(ls -1dt "$STATE_DIR"/mirrors-* 2>/dev/null | head -1)
+	[[ -n $latest ]] || die "no mirrorlist backup found in $STATE_DIR"
+	info "restoring from $latest"
+	restore_from "$latest" || die "restore failed"
+	(( DRY_RUN )) || ok "mirrorlists restored"
+}
+
+do_mirrors() {
+	section "Mirror ranking"
+	info "current mirrorlist: $(grep -cE '^[[:space:]]*Server[[:space:]]*=' /etc/pacman.d/mirrorlist 2>/dev/null || echo 0) servers"
+	backup_mirrors || return
+
+	if have cachyos-rate-mirrors; then
+		info "using cachyos-rate-mirrors (arch + cachyos mirrorlists)"
+		run cachyos-rate-mirrors || true
+	elif have reflector; then
+		info "using reflector (arch mirrorlist only)"
+		run reflector --protocol https --latest 25 --sort rate \
+			--download-timeout 10 --save /etc/pacman.d/mirrorlist || true
+	elif have rate-mirrors; then
+		info "using rate-mirrors (arch mirrorlist only)"
+		run rate-mirrors --save /etc/pacman.d/mirrorlist arch || true
+	else
+		warn "no mirror ranking tool found (cachyos-rate-mirrors, reflector, rate-mirrors)"
+		return
+	fi
+
+	(( DRY_RUN )) && return
+	local n
+	n=$(grep -cE '^[[:space:]]*Server[[:space:]]*=' /etc/pacman.d/mirrorlist 2>/dev/null || true)
+	if (( n < 1 )); then
+		warn "ranking produced an empty mirrorlist - rolling back"
+		restore_from "$BACKUP_DIR" || true
+		FAILED+=("mirror ranking produced an empty mirrorlist")
+	else
+		ok "mirrorlist now has $n servers"
+	fi
+}
+
+# -------------------------------------------------------------------- keyring ---
+do_keyring() {
+	section "Keyring"
+	if [[ ! -d /etc/pacman.d/gnupg ]]; then
+		info "initializing keyring"
+		run pacman-key --init || return
+	fi
+
+	local -a rings=(archlinux)
+	[[ -e /usr/share/pacman/keyrings/cachyos.gpg ]] && rings+=(cachyos)
+	info "repopulating packaged keys: ${rings[*]}"
+	run pacman-key --populate "${rings[@]}" || true
+	run pacman-key --updatedb || true
+
+	if (( KEYSERVER )); then
+		info "refreshing keys from the keyserver (this can take several minutes)"
+		run pacman-key --refresh-keys || warn "keyserver refresh reported errors (common; packaged keys are still in place)"
+	fi
+}
+
+# -------------------------------------------------------------------- refresh ---
+do_refresh() {
+	section "Sync databases"
+	run pacman -Syy || {
+		warn "could not refresh sync databases (network or mirror problem?)"
+		info "if this began after mirror ranking, roll back with: $PROG --restore-mirrors"
+		return
+	}
+	(( DRY_RUN )) || ok "sync databases refreshed"
+	info "run 'paru -Syu' to complete a full upgrade - do not install single packages first"
+}
+
+# ---------------------------------------------------------------------- cache ---
+prune_sync_dbs() {
+	local -a repos=()
+	mapfile -t repos < <(awk '/^\[/{gsub(/[][]/,"");print}' /etc/pacman.conf 2>/dev/null)
+	local f base name
+	for f in /var/lib/pacman/sync/*.db /var/lib/pacman/sync/*.files; do
+		[[ -e $f ]] || continue
+		base=${f##*/}
+		name=${base%%.*}
+		if ! printf '%s\n' "${repos[@]}" | grep -qx -- "$name"; then
+			info "unused sync database: $base"
+			run rm -f -- "$f" "$f.sig"
+		fi
+	done
+}
+
+do_cache() {
+	section "Package cache"
+	CACHE_DIR=$(pacman-conf CacheDir 2>/dev/null | head -1)
+	CACHE_DIR=${CACHE_DIR%/}
+	[[ -n $CACHE_DIR && -d $CACHE_DIR ]] || { warn "cache directory not found"; return; }
+
+	CACHE_BEFORE=$(cache_bytes "$CACHE_DIR")
+	CACHE_AFTER=$CACHE_BEFORE
+	local files
+	files=$(find "$CACHE_DIR" -maxdepth 1 -name '*.pkg.tar*' ! -name '*.sig' 2>/dev/null | wc -l)
+	printf '   %s: %s in %s package files\n' "$CACHE_DIR" "$(human "$CACHE_BEFORE")" "$files"
+
+	if ! have paccache; then
+		warn "paccache not found (pacman-contrib) - skipping cache clean"
+		return
+	fi
+
+	local est
+	est=$(paccache -d -k "$KEEP" 2>&1 | tail -1)
+	[[ -n $est ]] && printf '   keep=%s: %s\n' "$KEEP" "$est"
+
+	if ! confirm "Remove cached packages beyond $KEEP versions and all uninstalled packages?"; then
+		info "cache clean skipped"
+	else
+		CACHE_CLEANED=1
+		run paccache -r -u -k 0 || true
+		run paccache -r -k "$KEEP" || true
+	fi
+
+	if (( AGGRESSIVE )); then
+		if (( DRY_RUN )) && (( EUID != 0 )); then
+			info "[dry-run] stale download directories and unused sync DBs are checked as root"
+		else
+			local -a stale=()
+			mapfile -t stale < <(find "$CACHE_DIR" -maxdepth 1 -type d -name 'download-*' -empty -mmin +60 2>/dev/null)
+			if ((${#stale[@]})); then
+				info "removing ${#stale[@]} stale empty download directories"
+				run rmdir -- "${stale[@]}" || true
+			fi
+			prune_sync_dbs
+		fi
+	fi
+
+	if (( ! DRY_RUN )); then
+		CACHE_AFTER=$(cache_bytes "$CACHE_DIR")
+		if (( CACHE_CLEANED )); then
+			ok "cache now $(human "$CACHE_AFTER") (freed $(human $((CACHE_BEFORE - CACHE_AFTER))))"
+		fi
+	fi
+}
+
+# ----------------------------------------------------------------------- paru ---
+do_paru() {
+	section "paru cache"
+	local user= home
+	if [[ -n ${SUDO_USER:-} && ${SUDO_USER} != root ]]; then
+		user=$SUDO_USER
+	elif (( EUID != 0 )); then
+		user=$(id -un)
+	else
+		user=$(logname 2>/dev/null || true)
+	fi
+	if [[ -z $user || $user == root ]]; then
+		warn "cannot identify the invoking user; skipping paru cache (run via sudo)"
+		return
+	fi
+	home=$(getent passwd "$user" | cut -d: -f6)
+	if [[ -z $home || ! -d $home/.cache/paru ]]; then
+		info "no paru cache for $user"
+		return
+	fi
+
+	local cdir=$home/.cache/paru/clone
+	if [[ -d $cdir ]]; then
+		printf '   %s: %s in %s clones\n' "$cdir" \
+			"$(human "$(cache_bytes "$cdir")")" \
+			"$(find "$cdir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
+	fi
+
+	if (( ! PARU_CLEAN )); then
+		info "pass --paru-cache to clean AUR clones (or --paru-cache-all to delete them)"
+		return
+	fi
+	have paru || { warn "paru not found"; return; }
+
+	if (( PARU_CLEAN_ALL )); then
+		confirm "Delete ALL paru AUR clone directories for $user?" || { info "skipped"; return; }
+		run sudo -u "$user" env HOME="$home" paru --aur -Scc --noconfirm || true
+	else
+		confirm "Clean untracked files in paru AUR clones for $user (clones are kept)?" \
+			|| { info "skipped"; return; }
+		run sudo -u "$user" env HOME="$home" paru --aur -Sc --noconfirm || true
+	fi
+}
+
+# -------------------------------------------------------------------- pkgfile ---
+do_pkgfile() {
+	section "pkgfile database"
+	if ! have pkgfile; then
+		info "pkgfile not installed - skipping"
+		return
+	fi
+	run pkgfile --update || warn "pkgfile update failed"
+}
+
+do_filesdb() {
+	section "pacman files database"
+	run pacman -Fy || warn "could not fetch files databases"
+}
+
+# --------------------------------------------------------------------- checks ---
+do_checks() {
+	section "Database and system checks"
+
+	if pacman -Dk >/dev/null 2>&1; then
+		ok "local database is consistent"
+	else
+		warn "pacman -Dk reported database errors:"
+		pacman -Dk 2>&1 | sed 's/^/     /' | head -20
+		FAILED+=("pacman -Dk reported errors")
+	fi
+
+	local orphans
+	orphans=$(pacman -Qdtq 2>/dev/null || true)
+	if [[ -n $orphans ]]; then
+		printf '   orphaned dependencies: %s\n' "$(wc -l <<<"$orphans")"
+		printf '%s\n' "$orphans" | sed 's/^/     /' | head -20
+		info "review them; remove manually with: paru -Rns <pkg>"
+	else
+		ok "no orphaned dependencies"
+	fi
+
+	local foreign
+	foreign=$(pacman -Qmq 2>/dev/null || true)
+	[[ -n $foreign ]] && printf '   foreign (AUR/local) packages: %s\n' "$(wc -l <<<"$foreign")"
+
+	if have checkupdates; then
+		local updates
+		if updates=$(timeout 120 checkupdates 2>/dev/null); then
+			if [[ -n $updates ]]; then
+				printf '   pending updates: %s\n' "$(wc -l <<<"$updates")"
+				printf '%s\n' "$updates" | sed 's/^/     /' | head -20
+			else
+				ok "no pending updates"
+			fi
+		else
+			warn "checkupdates failed (network?)"
+		fi
+	fi
+
+	local -a pacnew=()
+	mapfile -t pacnew < <(find /etc -maxdepth 2 \( -name '*.pacnew' -o -name '*.pacsave' \) 2>/dev/null)
+	if ((${#pacnew[@]})); then
+		printf '   config files needing review: %s\n' "${#pacnew[@]}"
+		printf '%s\n' "${pacnew[@]}" | sed 's/^/     /' | head -20
+		info "review with: pacdiff"
+	fi
+
+	if (( CHECK_FILES )); then
+		if (( DRY_RUN )); then
+			printf '%s[dry-run]%s pacman -Qkk\n' "$C_YELLOW" "$C_RESET"
+		else
+			info "verifying installed files (pacman -Qkk, this takes a while)"
+			local bad
+			bad=$(pacman -Qkk 2>&1 | grep -vE ': [0-9]+ total files, 0 altered files$' || true)
+			if [[ -z $bad ]]; then
+				ok "all installed files present and unaltered"
+			else
+				warn "file check reported problems:"
+				printf '%s\n' "$bad" | head -40
+				FAILED+=("pacman -Qkk reported problems")
+			fi
+		fi
+	fi
+}
+
+# -------------------------------------------------------------------- summary ---
+summary() {
+	section "Summary"
+	if ((${#FAILED[@]})); then
+		warn "${#FAILED[@]} step(s) reported errors:"
+		printf '     - %s\n' "${FAILED[@]}"
+	else
+		ok "no errors"
+	fi
+	(( CACHE_CLEANED )) && ! (( DRY_RUN )) && \
+		printf '   cache: %s -> %s\n' "$(human "$CACHE_BEFORE")" "$(human "$CACHE_AFTER")"
+
+	printf '\n   Next steps:\n'
+	printf '     * finish a full upgrade:  paru -Syu\n'
+	printf '     * review config changes:  pacdiff\n'
+	printf '     * roll back mirrors:      %s --restore-mirrors\n' "$PROG"
+	printf '     * logs and backups:       %s\n' "$STATE_DIR"
+}
+
+# ----------------------------------------------------------------------- main ---
+parse_args "$@"
+
+if (( EUID != 0 )) && (( ! DRY_RUN )); then
+	have sudo || die "must run as root (sudo not found)"
+	script=$(readlink -f -- "$0" 2>/dev/null || printf '%s' "$0")
+	exec sudo -- "$script" "$@"
+fi
+
+setup_logging
+
+section "$PROG $VERSION"
+(( DRY_RUN )) && info "dry run - nothing will be changed"
+
+preflight
+
+if (( RESTORE )); then
+	restore_mirrors
+	exit 0
+fi
+
+(( DO_MIRRORS )) && do_mirrors
+(( DO_KEYRING )) && do_keyring
+(( DO_REFRESH )) && do_refresh
+(( DO_CACHE )) && do_cache
+(( DO_PKGFILE )) && do_pkgfile
+(( FILESDB )) && do_filesdb
+do_paru
+do_checks
+summary
+
+((${#FAILED[@]})) && exit 1
+exit 0

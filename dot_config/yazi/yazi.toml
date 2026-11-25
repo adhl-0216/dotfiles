@@ -1,0 +1,9 @@
+[opener]
+play = [
+	{ run = "mpv --fs --loop --volume=20 %s", orphan = true, for = "unix" },
+]
+open = [
+  { run = "satty -f %s"},
+  { run = "feh -F %s"},
+]
+

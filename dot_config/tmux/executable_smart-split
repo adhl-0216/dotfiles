@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# More than one pane: split, then let tmux rebalance everything.
+if (($(tmux display-message -p '#{window_panes}') > 1)); then
+  tmux split-window -h
+  tmux select-layout tiled
+  exit 0
+fi
+
+# First split: determine how much of the focused monitor the
+# Niri terminal window currently occupies.
+
+window_width=$(
+  niri msg --json focused-window |
+    jq -r '.layout.window_size[0]'
+)
+
+output_width=$(
+  niri msg --json focused-output |
+    jq -r '.logical.width'
+)
+
+# Sanity check.
+if [[ "$window_width" == "null" || "$output_width" == "null" ]]; then
+  tmux split-window -h
+  exit 0
+fi
+
+# <= 50% monitor width:
+#   vertical tmux split = top / bottom
+#
+# > 50% monitor width:
+#   horizontal tmux split = left / right
+if awk "BEGIN { exit !($window_width * 2 <= $output_width) }"; then
+  tmux split-window -v
+else
+  tmux split-window -h
+fi

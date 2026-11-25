@@ -1,0 +1,36 @@
+# Style
+font-size = 12
+
+window-decoration = false
+window-padding-x = 0
+window-padding-balance = true
+background-opacity = 0.8
+background-blur = false
+background-blur-radius = 32
+
+unfocused-split-opacity = 0.5
+unfocused-split-fill = #44464f
+theme = Material Design Colors
+
+# Options
+scrollback-limit = 10000000
+
+cursor-style = block
+cursor-style-blink = true
+
+mouse-hide-while-typing = true
+copy-on-select = false
+confirm-close-surface = false
+
+gtk-titlebar = false
+gtk-single-instance = true
+app-notifications = true
+
+# Shell integration
+shell-integration = detect
+shell-integration-features = cursor,sudo,title,no-cursor
+
+# Keybind
+keybind = ctrl+enter=unbind
+keybind = ctrl+shift+e=unbind
+keybind = ctrl+shift+x=close_surface

@@ -1,0 +1,22 @@
+# Repo documentation, not dotfiles
+LICENSE
+README.md
+
+# Live application state / generated content
+.config/tmux/plugins/**
+.config/dms/plugins/**
+.config/dms/.changelog-*
+.config/dms/.firstlaunch
+.config/opencode/node_modules/**
+.config/opencode/service.json
+.config/zsh/.zcompdump*
+.config/rclone/**
+.ssh/**
+.local/share/atuin/**
+.local/bin/mant
+.local/bin/mise
+
+# Transient files
+**/*.tmp
+**/*.bak
+**/*.bak-*

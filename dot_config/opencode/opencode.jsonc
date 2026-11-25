@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "formatter": true,
+  "default_agent": "sysadmin",
+  "provider": {
+    "lmstudio-local": {
+      "name": "lmstudio-local",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "http://localhost:1234/v1"
+      }
+    },
+    "lmstudio-aifarm": {
+      "name": "lmstudio-aifarm",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://ai-farm.coin-hippocampus.ts.net:1234/v1",
+      },
+      "models": {
+        "qwen/qwen3.8-27b": { "name": "Qwen 3.8 27B", },
+        "prism-ml/bonsai-27b": { "name": "Bonsai 27B", },
+      }
+    }
+  }
+}
