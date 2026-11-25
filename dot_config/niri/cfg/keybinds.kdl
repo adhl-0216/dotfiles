@@ -15,6 +15,7 @@ binds {
     Mod+ALT+L                           hotkey-overlay-title="Lock Screen: noctalia lock" { spawn-sh "qs -c noctalia-shell ipc call lockScreen lock"; }
     Mod+Shift+Q                         hotkey-overlay-title="Session Menu: noctalia sessionMenu" { spawn-sh "qs -c noctalia-shell ipc call sessionMenu toggle"; }
     Mod+I                               hotkey-overlay-title="Open Settings" { spawn-sh "qs -c noctalia-shell ipc call settings toggle"; }
+    Mod+Meta+I                          hotkey-overlay-title="Open Network Panel" { spawn-sh "qs -c noctalia-shell ipc call network togglePanel"; }
     Mod+A                               hotkey-overlay-title="Open Control Center" { spawn-sh "qs -c noctalia-shell ipc call controlCenter toggle"; }
     Mod+V                               hotkey-overlay-title="Open Clipper" { spawn-sh "qs -c noctalia-shell ipc call plugin:clipper togglePanel"; }
 
