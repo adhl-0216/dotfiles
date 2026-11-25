@@ -55,3 +55,10 @@ alias tmuxconf="cfgedit $XDG_CONFIG_HOME/tmux/tmux.conf"
 
 alias open=xdg-open
 alias oc=opencode
+
+# Re-add modified managed dotfiles to chezmoi, show leftovers, then push
+cmup() {
+    chezmoi re-add "$@"
+    chezmoi status
+    chezmoi push
+}
